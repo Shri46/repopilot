@@ -1,0 +1,5 @@
+{"question": "Where is the database connection configured?", "expected_file_substring": "db.py", "reference_answer": "The database connection is configured in app/core/db.py, which creates a SQLAlchemy engine from the DATABASE_URL setting."}
+{"question": "How are code files chunked for ingestion?", "expected_file_substring": "chunker.py", "reference_answer": "Python files are chunked at function/class boundaries using the ast module; other files use a sliding line-window chunker."}
+{"question": "How does hybrid search combine vector and keyword results?", "expected_file_substring": "hybrid.py", "reference_answer": "It merges pgvector cosine-similarity results and BM25 keyword results using Reciprocal Rank Fusion (RRF)."}
+{"question": "What tools can the agent call?", "expected_file_substring": "tools.py", "reference_answer": "search_code, read_file, grep, run_tests, and git_blame."}
+{"question": "How many steps can the agent take before it must give a final answer?", "expected_file_substring": "config.py", "reference_answer": "It is capped by the AGENT_MAX_STEPS setting, default 6 steps."}
