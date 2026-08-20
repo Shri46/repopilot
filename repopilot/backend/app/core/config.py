@@ -7,11 +7,11 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     gemini_api_key: str = ""
-    database_url: str = "postgresql+psycopg://repopilot:repopilot@localhost:5432/repopilot"
+    database_url: str = "postgresql+psycopg://repopilot:repopilot@localhost:5433/repopilot"
 
     agent_max_steps: int = 6
-    agent_model: str = "gemini-2.0-flash"
-    embedding_model: str = "text-embedding-004"
+    agent_model: str = "gemini-3.5-flash-lite"
+    embedding_model: str = "gemini-embedding-001"
     embedding_dim: int = 768
 
     retrieval_top_k: int = 8

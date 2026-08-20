@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 
 from google import genai
 from google.genai import types
+from google.genai.errors import ClientError
 
 from app.core.config import get_settings
 
@@ -44,11 +45,19 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
     client = _client()
-    result = client.models.embed_content(
-        model=settings.embedding_model,
-        contents=texts,
-    )
-    return [e.values for e in result.embeddings]
+    for attempt in range(5):
+        try:
+            result = client.models.embed_content(
+                model=settings.embedding_model,
+                contents=texts,
+                config=types.EmbedContentConfig(output_dimensionality=settings.embedding_dim),
+            )
+            return [e.values for e in result.embeddings]
+        except ClientError as e:
+            if e.code == 429 and attempt < 4:
+                time.sleep(15)
+                continue
+            raise
 
 
 def generate_with_tools(

@@ -1,4 +1,6 @@
-const BASE = "/api";
+// The Vite dev proxy doesn't reliably forward long-lived SSE streams (observed hangs on
+// the query/stream endpoint), so talk to the backend directly instead of going through /api.
+const BASE = "http://localhost:8000/api";
 
 export async function listProjects() {
   const res = await fetch(`${BASE}/projects`);
@@ -11,49 +13,23 @@ export async function listEvalRuns(projectId) {
 }
 
 /**
- * Streams an agent run over SSE. Calls onStep(stepObj) for each step and
- * onDone(doneObj) when the final answer arrives.
+ * Streams an agent run over SSE using the native EventSource API. Calls onStep(stepObj)
+ * for each step and onDone(doneObj) when the final answer arrives.
  */
 export function streamQuery(projectId, question, { onStep, onDone, onError }) {
-  const controller = new AbortController();
+  const url = `${BASE}/query/stream?${new URLSearchParams({ project_id: projectId, question })}`;
+  const source = new EventSource(url);
 
-  fetch(`${BASE}/query/stream`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ project_id: projectId, question }),
-    signal: controller.signal,
-  })
-    .then(async (res) => {
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
+  source.addEventListener("step", (e) => onStep?.(JSON.parse(e.data)));
+  source.addEventListener("done", (e) => {
+    onDone?.(JSON.parse(e.data));
+    source.close();
+  });
+  source.onerror = (err) => {
+    source.close();
+    console.error("streamQuery failed:", err);
+    onError?.(err);
+  };
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-
-        const events = buffer.split("\n\n");
-        buffer = events.pop() ?? "";
-
-        for (const raw of events) {
-          const lines = raw.split("\n");
-          let event = "message";
-          let data = "";
-          for (const line of lines) {
-            if (line.startsWith("event:")) event = line.slice(6).trim();
-            if (line.startsWith("data:")) data += line.slice(5).trim();
-          }
-          if (!data) continue;
-          const parsed = JSON.parse(data);
-          if (event === "step") onStep?.(parsed);
-          if (event === "done") onDone?.(parsed);
-        }
-      }
-    })
-    .catch((err) => {
-      if (err.name !== "AbortError") onError?.(err);
-    });
-
-  return () => controller.abort();
+  return () => source.close();
 }

@@ -115,11 +115,9 @@ def run_agent(
             steps.append(step)
             yield step
 
-            # Feed the model's function call + our tool result back into the conversation.
-            contents.append(types.Content(
-                role="model",
-                parts=[types.Part(function_call=types.FunctionCall(name=call["name"], args=call["args"]))],
-            ))
+            # Feed the model's turn back verbatim (not reconstructed) so fields like
+            # thought_signature that Gemini 3.x requires on replayed function-call turns survive.
+            contents.append(result.raw.candidates[0].content)
             contents.append(types.Content(
                 role="user",
                 parts=[types.Part(function_response=types.FunctionResponse(
