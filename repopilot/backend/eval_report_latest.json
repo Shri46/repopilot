@@ -1,0 +1,61 @@
+{
+  "dataset_name": "golden_demo.jsonl",
+  "num_examples": 5,
+  "precision_at_k": 0.8,
+  "mrr": 0.54,
+  "judge_score_avg": 5.0,
+  "avg_latency_ms": 14012.69664000065,
+  "avg_cost_usd": 0.0008191,
+  "examples": [
+    {
+      "question": "Where is the database connection configured?",
+      "reference_answer": "The database connection is configured in app/core/db.py, which creates a SQLAlchemy engine from the DATABASE_URL setting.",
+      "agent_answer": "The database connection is configured in **`backend/app/core/db.py`**, which initializes a SQLAlchemy engine using the `DATABASE_URL` setting loaded from configuration:\n\n* **`backend/app/core/db.py`**:\n  - Creates the SQLAlchemy engine using `create_engine(settings.database_url, pool_pre_ping=True)` (lines 7\u20138).\n  - Sets up `SessionLocal` for session management (line 9).\n  - Provides the `get_db()` dependency generator used across FastAPI routes (lines 17\u201323).\n* **`backend/app/core/config.py`**:\n  - Defines the `database_url` setting (defaulting to PostgreSQL with `psycopg`) via Pydantic settings, loaded from environment variables or `.env` files (lines 9\u201310).",
+      "retrieval_hit": true,
+      "reciprocal_rank": 0.2,
+      "judge_score": 5.0,
+      "latency_ms": 15159.484600000724,
+      "cost_usd": 0.0006817
+    },
+    {
+      "question": "How are code files chunked for ingestion?",
+      "reference_answer": "Python files are chunked at function/class boundaries using the ast module; other files use a sliding line-window chunker.",
+      "agent_answer": "Code files are chunked for ingestion using strategies tailored to the file type (`backend/app/ingestion/chunker.py`):\n\n1. **Python Files (`.py`)**:\n   - Chunked at **function and class boundaries** using Python's built-in `ast` module (`chunk_python_source`). This creates coherent retrieval units (e.g., individual function or class bodies) rather than splitting code arbitrarily.\n   - Any module-level code not captured inside functions or classes (such as imports, constants, and top-of-file docstrings) is grouped into a separate chunk labeled with the symbol `<module-level>`.\n   - If a syntax error is encountered when parsing a Python file, it automatically falls back to the generic sliding window chunker (`chunk_python_source` tries `ast.parse` and catches `SyntaxError`).\n\n---\n\n2. **Non-Python Files (All Other Extensions)**:\n   - Uses a **sliding line-window chunker** (`chunk_generic`).\n   - The default window size is `WINDOW_LINES = 60` lines with an overlap of `WINDOW_OVERLAP = 10` lines (`step = 50` lines).\n\n---\n\n3. **Exclusions**:\n   - Files and directories matching common generated, vendored, or binary-ish patterns are skipped (`should_skip_path`), including directories like `.git`, `node_modules`, `__pycache__`, `.venv`, `dist`, `build`, etc., and extensions like images, archives, lock files, and minified maps (`SKIP_EXTENSIONS`, `SKIP_DIR_NAMES`).\n   - Files exceeding `MAX_FILE_BYTES` (500,000 bytes) are also skipped.",
+      "retrieval_hit": true,
+      "reciprocal_rank": 1.0,
+      "judge_score": 5.0,
+      "latency_ms": 12128.82030000037,
+      "cost_usd": 0.0008945
+    },
+    {
+      "question": "How does hybrid search combine vector and keyword results?",
+      "reference_answer": "It merges pgvector cosine-similarity results and BM25 keyword results using Reciprocal Rank Fusion (RRF).",
+      "agent_answer": "In this codebase, hybrid search is implemented in [`backend/app/retrieval/hybrid.py`](backend/app/retrieval/hybrid.py). It combines **vector similarity search** (using Postgres `pgvector` and Gemini embeddings) and **BM25 keyword search** (using an in-process BM25 index persisted to disk) using **Reciprocal Rank Fusion (RRF)**.\n\nHere is the step-by-step breakdown of how the combination works:\n\n1. **Parallel Candidate Retrieval (`candidate_pool`)**:\n   - For a given user query, it computes a query embedding and runs a vector similarity search (`_vector_search`) against Postgres using cosine distance (`Chunk.embedding.cosine_distance`) to get top candidate chunk IDs.\n   - Concurrently, it runs a BM25 tokenized search (`_bm25_search`) against the serialized BM25 index for the project to get top candidate chunk IDs.\n   - Each method retrieves a larger candidate pool (defaulting to `max(top_k * 3, 20)`) to ensure good overlap and coverage.\n\n2. **Rank Mapping**:\n   - It maps each unique chunk ID from both retrieval methods to its 1-based ordinal rank in each respective result list:\n     - `vector_rank[cid] = i + 1`\n     - `bm25_rank[cid] = i + 1`\n\n3. **Reciprocal Rank Fusion (RRF)**:\n   - Instead of trying to calibrate or normalize raw scores from two completely different scoring systems (cosine distance vs. BM25 term frequency scores), RRF combines results purely based on **ranks**.\n   - For every unique chunk found in either list, a fused score is calculated using the standard RRF formula with a smoothing constant $K = 60$ (`RRF_K`):\n     $$\\text{Score}(d) = \\sum_{m \\in M} \\frac{1}{K + \\text{rank}_m(d)}$$\n     Specifically in code:\n     ```python\n     if cid in vector_rank:\n         score += 1.0 / (RRF_K + vector_rank[cid])\n     if cid in bm25_rank:\n         score += 1.0 / (RRF_K + bm25_rank[cid])\n     ```\n     *Note: Chunks that appear near the top of both lists receive the highest cumulative RRF scores, while chunks appearing in only one list still get partial credit based on their rank.*\n\n4. **Sorting and Fetching**:\n   - The unique chunk IDs are sorted in descending order of their `fused_score`, and trimmed to the requested `top_k` limit.\n   - Finally, the full chunk details (file path, symbol, line range, content) are fetched from the database and returned as a list of `RetrievedChunk` objects containing their individual vector rank, BM25 rank, and final fused score.",
+      "retrieval_hit": true,
+      "reciprocal_rank": 1.0,
+      "judge_score": 5.0,
+      "latency_ms": 13539.36690000046,
+      "cost_usd": 0.0010939
+    },
+    {
+      "question": "What tools can the agent call?",
+      "reference_answer": "search_code, read_file, grep, run_tests, and git_blame.",
+      "agent_answer": "The agent can call five tools, defined in `backend/app/agent/tools.py`:\n\n1. **`search_code`**: Performs a semantic and keyword (hybrid) search over the ingested codebase.\n   - *Parameters*: `query` (string, natural language or keyword query)\n\n2. **`read_file`**: Reads a file (with optional start and end line ranges) from the repository to inspect full context around a code reference.\n   - *Parameters*: `file_path` (string, relative to repo root), `start_line` (integer, optional), `end_line` (integer, optional)\n\n3. **`grep`**: Performs a regex or text search across the repository for exact strings or patterns (such as function names or error strings).\n   - *Parameters*: `pattern` (string)\n\n4. **`run_tests`**: Runs the repository's `pytest` suite (optionally targeting a specific file or directory path) in a sandboxed subprocess.\n   - *Parameters*: `test_path` (string, optional)\n\n5. **`git_blame`**: Finds who last modified a file or line range and when, which is useful for \"who wrote this\" or \"when did this change\" questions.\n   - *Parameters*: `file_path` (string), `start_line` (integer), `end_line` (integer)",
+      "retrieval_hit": true,
+      "reciprocal_rank": 0.5,
+      "judge_score": 5.0,
+      "latency_ms": 9022.943300002225,
+      "cost_usd": 0.0006566000000000001
+    },
+    {
+      "question": "How many steps can the agent take before it must give a final answer?",
+      "reference_answer": "It is capped by the AGENT_MAX_STEPS setting, default 6 steps.",
+      "agent_answer": "The agent can take up to **6** steps (`agent_max_steps = 6`) before it must give a final answer (or reach the fallback mechanism if the limit is exhausted). \n\nThis configuration is defined in `backend/app/core/config.py` on line 12 and drives the agent execution loop in `backend/app/agent/loop.py`.",
+      "retrieval_hit": false,
+      "reciprocal_rank": 0.0,
+      "judge_score": 5.0,
+      "latency_ms": 20212.86809999947,
+      "cost_usd": 0.0007687999999999999
+    }
+  ]
+}

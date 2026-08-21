@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { listProjects, streamQuery } from "../api";
+import { deleteProject, listProjects, streamQuery } from "../api";
+import IngestPanel from "../components/IngestPanel";
 import StepTrace from "../components/StepTrace";
 
 export default function ChatPage() {
@@ -8,14 +9,40 @@ export default function ChatPage() {
   const [question, setQuestion] = useState("");
   const [messages, setMessages] = useState([]); // {role, text, steps, meta}
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const cancelRef = useRef(null);
 
-  useEffect(() => {
-    listProjects().then((data) => {
+  function refreshProjects(selectId) {
+    return listProjects().then((data) => {
       setProjects(data);
-      if (data.length > 0) setProjectId(data[0].id);
+      if (selectId) setProjectId(selectId);
+      else if (data.length > 0 && !projectId) setProjectId(data[0].id);
+      return data;
     });
+  }
+
+  useEffect(() => {
+    refreshProjects();
   }, []);
+
+  async function handleDelete() {
+    const project = projects.find((p) => p.id === projectId);
+    if (!project || deleting) return;
+    if (!window.confirm(`Delete "${project.name}" and all its ingested data? This can't be undone.`)) return;
+
+    setDeleting(true);
+    try {
+      await deleteProject(projectId);
+      setMessages([]);
+      const remaining = await listProjects();
+      setProjects(remaining);
+      setProjectId(remaining[0]?.id || "");
+    } catch (err) {
+      alert(err.message || "Delete failed");
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   function ask() {
     if (!question.trim() || !projectId || loading) return;
@@ -53,7 +80,7 @@ export default function ChatPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-140px)]">
-      <div className="mb-4 flex items-center gap-2">
+      <div className="mb-3 flex items-center gap-2 flex-wrap">
         <label className="text-sm text-slate-600">Project:</label>
         <select
           className="border border-slate-300 rounded-md px-2 py-1 text-sm"
@@ -66,12 +93,22 @@ export default function ChatPage() {
             </option>
           ))}
         </select>
+        {projectId && (
+          <button
+            onClick={handleDelete}
+            disabled={deleting}
+            title="Delete this project"
+            className="text-xs text-red-500 hover:text-red-700 disabled:opacity-40"
+          >
+            {deleting ? "Deleting…" : "Delete"}
+          </button>
+        )}
         {projects.length === 0 && (
-          <span className="text-xs text-slate-400">
-            No projects yet — ingest one with scripts/ingest.py
-          </span>
+          <span className="text-xs text-slate-400">No projects yet — ingest one below</span>
         )}
       </div>
+
+      <IngestPanel onIngested={(p) => refreshProjects(p.id)} />
 
       <div className="flex-1 overflow-y-auto space-y-4 pb-4">
         {messages.map((m, i) =>

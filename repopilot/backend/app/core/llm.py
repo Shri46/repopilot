@@ -29,6 +29,23 @@ def _client() -> genai.Client:
     return genai.Client(api_key=settings.gemini_api_key)
 
 
+def _with_retry(fn, attempts: int = 5, delay_seconds: float = 15.0):
+    """Retries a Gemini call on 429 (rate limit) with a fixed backoff.
+
+    The free tier's per-minute quota is tight enough that any multi-call flow (the agent
+    loop, an eval run scoring several examples) can trip it under normal use, not just
+    heavy testing — so every call site needs this, not just embeddings.
+    """
+    for attempt in range(attempts):
+        try:
+            return fn()
+        except ClientError as e:
+            if e.code == 429 and attempt < attempts - 1:
+                time.sleep(delay_seconds)
+                continue
+            raise
+
+
 @dataclass
 class GenerationResult:
     text: str
@@ -45,19 +62,12 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     if not texts:
         return []
     client = _client()
-    for attempt in range(5):
-        try:
-            result = client.models.embed_content(
-                model=settings.embedding_model,
-                contents=texts,
-                config=types.EmbedContentConfig(output_dimensionality=settings.embedding_dim),
-            )
-            return [e.values for e in result.embeddings]
-        except ClientError as e:
-            if e.code == 429 and attempt < 4:
-                time.sleep(15)
-                continue
-            raise
+    result = _with_retry(lambda: client.models.embed_content(
+        model=settings.embedding_model,
+        contents=texts,
+        config=types.EmbedContentConfig(output_dimensionality=settings.embedding_dim),
+    ))
+    return [e.values for e in result.embeddings]
 
 
 def generate_with_tools(
@@ -77,11 +87,11 @@ def generate_with_tools(
         tools=tools,
     )
 
-    response = client.models.generate_content(
+    response = _with_retry(lambda: client.models.generate_content(
         model=settings.agent_model,
         contents=contents,
         config=config,
-    )
+    ))
 
     latency_ms = (time.perf_counter() - start) * 1000
 
@@ -139,7 +149,7 @@ Score the candidate answer from 0 to 5:
 
 Respond with ONLY the integer score, nothing else."""
 
-    response = client.models.generate_content(model=settings.agent_model, contents=prompt)
+    response = _with_retry(lambda: client.models.generate_content(model=settings.agent_model, contents=prompt))
     text = (response.text or "0").strip()
     try:
         score = float("".join(c for c in text if c.isdigit() or c == "."))

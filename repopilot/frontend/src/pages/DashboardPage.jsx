@@ -10,7 +10,7 @@ import {
 } from "chart.js";
 import { useEffect, useState } from "react";
 import { Bar, Line } from "react-chartjs-2";
-import { listEvalRuns, listProjects } from "../api";
+import { listDatasets, listEvalRuns, listProjects, runEval } from "../api";
 import StatTile from "../components/StatTile";
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointElement, Legend, Tooltip);
@@ -29,18 +29,44 @@ export default function DashboardPage() {
   const [projects, setProjects] = useState([]);
   const [projectId, setProjectId] = useState("");
   const [runs, setRuns] = useState([]);
+  const [datasets, setDatasets] = useState([]);
+  const [datasetName, setDatasetName] = useState("");
+  const [runningEval, setRunningEval] = useState(false);
+  const [evalError, setEvalError] = useState("");
 
   useEffect(() => {
     listProjects().then((data) => {
       setProjects(data);
       if (data.length > 0) setProjectId(data[0].id);
     });
+    listDatasets().then((data) => {
+      setDatasets(data);
+      if (data.length > 0) setDatasetName(data[0]);
+    });
   }, []);
 
-  useEffect(() => {
+  function refreshRuns() {
     if (!projectId) return;
-    listEvalRuns(projectId).then((data) => setRuns([...data].reverse())); // chronological
+    return listEvalRuns(projectId).then((data) => setRuns([...data].reverse())); // chronological
+  }
+
+  useEffect(() => {
+    refreshRuns();
   }, [projectId]);
+
+  async function handleRunEval() {
+    if (!projectId || !datasetName || runningEval) return;
+    setRunningEval(true);
+    setEvalError("");
+    try {
+      await runEval(projectId, datasetName);
+      await refreshRuns();
+    } catch (err) {
+      setEvalError(err.message || "Eval run failed");
+    } finally {
+      setRunningEval(false);
+    }
+  }
 
   const latest = runs[runs.length - 1];
   const prev = runs[runs.length - 2];
@@ -101,7 +127,7 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <div className="mb-4 flex items-center gap-2">
+      <div className="mb-4 flex items-center gap-2 flex-wrap">
         <label className="text-sm text-slate-600">Project:</label>
         <select
           className="border border-slate-300 rounded-md px-2 py-1 text-sm"
@@ -112,11 +138,40 @@ export default function DashboardPage() {
             <option key={p.id} value={p.id}>{p.name}</option>
           ))}
         </select>
+
+        {datasets.length > 0 && (
+          <select
+            className="border border-slate-300 rounded-md px-2 py-1 text-sm"
+            value={datasetName}
+            onChange={(e) => setDatasetName(e.target.value)}
+            disabled={runningEval}
+          >
+            {datasets.map((d) => (
+              <option key={d} value={d}>{d}</option>
+            ))}
+          </select>
+        )}
+
+        <button
+          onClick={handleRunEval}
+          disabled={runningEval || !projectId || !datasetName}
+          className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-sm disabled:opacity-40"
+        >
+          {runningEval ? "Running eval…" : "Run eval"}
+        </button>
+        {runningEval && (
+          <span className="text-xs text-slate-500">
+            This runs the full agent loop per question — can take a minute or two.
+          </span>
+        )}
       </div>
+
+      {evalError && <p className="text-sm text-red-600 mb-4">{evalError}</p>}
 
       {runs.length === 0 ? (
         <p className="text-sm text-slate-500">
-          No eval runs yet. Run <code className="bg-slate-100 px-1 rounded">scripts/run_eval.py</code> to populate this dashboard.
+          No eval runs yet. Click <span className="font-medium">Run eval</span> above, or run{" "}
+          <code className="bg-slate-100 px-1 rounded">scripts/run_eval.py</code> from the CLI.
         </p>
       ) : (
         <>

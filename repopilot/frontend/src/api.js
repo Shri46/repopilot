@@ -12,6 +12,45 @@ export async function listEvalRuns(projectId) {
   return res.json();
 }
 
+export async function listDatasets() {
+  const res = await fetch(`${BASE}/eval/datasets`);
+  return res.json();
+}
+
+export async function runEval(projectId, datasetName) {
+  const res = await fetch(`${BASE}/eval/run`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ project_id: projectId, dataset_name: datasetName }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || `Eval run failed (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function ingestProject(name, repoPath) {
+  const res = await fetch(`${BASE}/projects/ingest`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, repo_path: repoPath }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || `Ingest failed (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function deleteProject(projectId) {
+  const res = await fetch(`${BASE}/projects/${projectId}`, { method: "DELETE" });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || `Delete failed (${res.status})`);
+  }
+}
+
 /**
  * Streams an agent run over SSE using the native EventSource API. Calls onStep(stepObj)
  * for each step and onDone(doneObj) when the final answer arrives.
