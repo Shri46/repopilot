@@ -18,12 +18,16 @@ services:
     rootDir: repopilot/backend
     dockerfilePath: ./Dockerfile
     plan: free
-    region: virginia # match your Neon region
+    region: ohio # matches the Neon project's us-east-2
     healthCheckPath: /api/health
     envVars:
-      # Neon connection string. Must use the psycopg driver, i.e. rewrite Neon's
-      # postgresql://...  as  postgresql+psycopg://...
+      # Neon's *pooled* connection string (hostname contains -pooler), rewritten from
+      # postgresql:// to postgresql+psycopg:// for SQLAlchemy.
       - key: DATABASE_URL
+        sync: false
+      # Neon's *direct* string (same, without -pooler). Used only by init_db.py: the
+      # pooled endpoint is PgBouncer in transaction mode and can't run CREATE EXTENSION.
+      - key: DATABASE_URL_UNPOOLED
         sync: false
       - key: GEMINI_API_KEY
         sync: false

@@ -9,6 +9,13 @@ class Settings(BaseSettings):
     gemini_api_key: str = ""
     database_url: str = "postgresql+psycopg://repopilot:repopilot@localhost:5433/repopilot"
 
+    # Optional direct (non-pooled) connection, used only for schema work in init_db.py.
+    # Neon's pooled endpoint runs PgBouncer in transaction mode, which can't do
+    # session-level operations like CREATE EXTENSION — and it fails in ways that never
+    # mention pooling. Leave empty when the database isn't behind a pooler (e.g. local
+    # Docker), and init_db falls back to database_url.
+    database_url_unpooled: str = ""
+
     agent_max_steps: int = 6
     agent_model: str = "gemini-3.5-flash-lite"
     embedding_model: str = "gemini-embedding-001"
