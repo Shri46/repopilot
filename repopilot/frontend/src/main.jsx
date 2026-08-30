@@ -3,6 +3,7 @@ import ReactDOM from "react-dom/client";
 import { BrowserRouter, Routes, Route, Link, useLocation } from "react-router-dom";
 import ChatPage from "./pages/ChatPage";
 import DashboardPage from "./pages/DashboardPage";
+import LandingPage from "./pages/LandingPage";
 import "./index.css";
 
 function useTheme() {
@@ -31,8 +32,8 @@ function NavBar({ theme, onToggleTheme }) {
   return (
     <nav className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
       <div className="max-w-5xl mx-auto px-4 py-3 flex items-center gap-4">
-        <span className="font-semibold text-slate-900 dark:text-slate-100">RepoPilot</span>
-        <Link className={linkClass("/")} to="/">Chat</Link>
+        <Link to="/" className="font-semibold text-slate-900 dark:text-slate-100">RepoPilot</Link>
+        <Link className={linkClass("/chat")} to="/chat">Chat</Link>
         <Link className={linkClass("/dashboard")} to="/dashboard">Dashboard</Link>
         <button
           onClick={onToggleTheme}
@@ -53,7 +54,8 @@ function App() {
       <NavBar theme={theme} onToggleTheme={() => setTheme((t) => (t === "dark" ? "light" : "dark"))} />
       <div className="max-w-5xl mx-auto px-4 py-6">
         <Routes>
-          <Route path="/" element={<ChatPage />} />
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/chat" element={<ChatPage />} />
           <Route path="/dashboard" element={<DashboardPage />} />
         </Routes>
       </div>
