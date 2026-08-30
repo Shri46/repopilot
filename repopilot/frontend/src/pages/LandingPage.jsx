@@ -54,7 +54,7 @@ function Metric({ label, value, loading }) {
 
 export default function LandingPage() {
   const [run, setRun] = useState(null);
-  const [state, setState] = useState("loading"); // loading | ready | unavailable
+  const [state, setState] = useState("loading"); // loading | ready | empty | unreachable
 
   useEffect(() => {
     let cancelled = false;
@@ -74,9 +74,12 @@ export default function LandingPage() {
             return;
           }
         }
-        if (!cancelled) setState("unavailable");
+        // Reached the API fine, there just aren't any eval runs recorded yet.
+        if (!cancelled) setState("empty");
       } catch {
-        if (!cancelled) setState("unavailable");
+        // Couldn't reach the API at all — on a free-tier host that usually means the
+        // service is spun down and waking up.
+        if (!cancelled) setState("unreachable");
       }
     })();
 
@@ -129,8 +132,10 @@ export default function LandingPage() {
           <p className="text-xs text-slate-500 dark:text-slate-400">
             {state === "ready"
               ? `latest eval run · ${run.num_examples} golden questions · project "${run.projectName}"`
-              : state === "unavailable"
-              ? "backend asleep — open the dashboard to wake it"
+              : state === "empty"
+              ? "no eval runs recorded yet — run one from the dashboard"
+              : state === "unreachable"
+              ? "waking the API up — this can take up to a minute on the free tier"
               : "loading latest run…"}
           </p>
         </div>
