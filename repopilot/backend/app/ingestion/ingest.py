@@ -20,6 +20,14 @@ settings = get_settings()
 EMBED_BATCH_SIZE = 32
 
 
+class IngestTooLargeError(Exception):
+    """Raised when a repo exceeds MAX_INGEST_CHUNKS, before any embedding calls are spent."""
+
+
+class IngestEmptyError(Exception):
+    """Raised when a path contains no chunkable source files."""
+
+
 def _iter_source_files(repo_path: Path):
     for root, dirs, files in os.walk(repo_path):
         rel_parts = Path(root).relative_to(repo_path).parts
@@ -41,19 +49,12 @@ def ingest_repo(db: Session, project_name: str, repo_path: str, embed: bool = Tr
     if not repo_path_obj.exists():
         raise FileNotFoundError(f"repo path does not exist: {repo_path}")
 
-    project = db.query(Project).filter_by(name=project_name).first()
-    if project is None:
-        project = Project(name=project_name, source_path=str(repo_path_obj))
-        db.add(project)
-        db.commit()
-        db.refresh(project)
-    else:
-        # Re-ingest: wipe old chunks for a clean rebuild.
-        db.query(Chunk).filter_by(project_id=project.id).delete()
-        db.commit()
-
     git_repo = get_repo(str(repo_path_obj))
 
+    # Everything up to the project row is deliberately side-effect free. Scanning, the size
+    # check, and embedding all happen first so that a repo that's too large — or an
+    # embedding call that runs out of quota partway through — leaves no half-created,
+    # zero-chunk project behind for someone to clean up by hand.
     raw_chunks = []
     for file_path in tqdm(list(_iter_source_files(repo_path_obj)), desc="scanning files"):
         try:
@@ -66,8 +67,15 @@ def ingest_repo(db: Session, project_name: str, repo_path: str, embed: bool = Tr
         raw_chunks.extend(chunk_file(text, rel_path))
 
     if not raw_chunks:
-        print("No chunkable files found — check the repo path and file types.")
-        return project
+        raise IngestEmptyError(
+            "No chunkable source files found — check the path and that it contains code."
+        )
+
+    if settings.max_ingest_chunks and len(raw_chunks) > settings.max_ingest_chunks:
+        raise IngestTooLargeError(
+            f"This repo produces {len(raw_chunks)} chunks, over the {settings.max_ingest_chunks} "
+            f"limit configured on this server. Try a smaller repo."
+        )
 
     texts = [c.content for c in raw_chunks]
     embeddings: list[list[float] | None] = [None] * len(texts)
@@ -78,6 +86,18 @@ def ingest_repo(db: Session, project_name: str, repo_path: str, embed: bool = Tr
             batch_embeddings = embed_texts(batch)
             for j, emb in enumerate(batch_embeddings):
                 embeddings[i + j] = emb
+
+    # The expensive work succeeded — now it's safe to write.
+    project = db.query(Project).filter_by(name=project_name).first()
+    if project is None:
+        project = Project(name=project_name, source_path=str(repo_path_obj))
+        db.add(project)
+        db.commit()
+        db.refresh(project)
+    else:
+        # Re-ingest: wipe old chunks for a clean rebuild.
+        db.query(Chunk).filter_by(project_id=project.id).delete()
+        db.commit()
 
     bm25_corpus_tokens = []
     chunk_rows = []

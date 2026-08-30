@@ -24,6 +24,19 @@ class Settings(BaseSettings):
     # deploying, and ingest via the clone-from-URL path instead.
     enable_fs_browser: bool = True
 
+    # --- Public-deployment guardrails -------------------------------------------------
+    # All default to "off" so local single-user use is unrestricted. Turn them on for any
+    # deployment strangers can reach, where the real risk isn't malice so much as one
+    # person ingesting a huge repo and burning the whole day's Gemini quota.
+    #
+    # 0 means unlimited.
+    max_ingest_chunks: int = 0      # reject a repo before embedding if it chunks to more
+    max_projects: int = 0           # cap total ingested projects
+    rate_limit_enabled: bool = False
+    rate_limit_ingest_per_hour: int = 3
+    rate_limit_query_per_hour: int = 30
+    rate_limit_eval_per_hour: int = 2
+
 
 @lru_cache
 def get_settings() -> Settings:

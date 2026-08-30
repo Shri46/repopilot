@@ -1,13 +1,17 @@
 import json
 
-from fastapi import APIRouter, Depends, HTTPException, Query as QueryParam
+from fastapi import APIRouter, Depends, HTTPException, Query as QueryParam, Request
 from sqlalchemy.orm import Session
 from sse_starlette.sse import EventSourceResponse
 from starlette.concurrency import run_in_threadpool
 
 from app.agent.loop import run_agent
+from app.core import limits
+from app.core.config import get_settings
 from app.core.db import get_db
 from app.models.tables import Project, Query, TraceStep
+
+settings = get_settings()
 
 router = APIRouter()
 
@@ -57,10 +61,13 @@ def _persist_run(db: Session, project_id: str, question: str, steps, final_answe
 
 @router.get("/stream")
 async def query_stream(
+    request: Request,
     project_id: str = QueryParam(...),
     question: str = QueryParam(...),
     db: Session = Depends(get_db),
 ):
+    limits.enforce(request, "query", settings.rate_limit_query_per_hour)
+
     project = db.get(Project, project_id)
     if project is None:
         raise HTTPException(404, "Project not found")

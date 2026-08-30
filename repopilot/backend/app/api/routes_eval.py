@@ -1,14 +1,18 @@
 import json
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core import limits
+from app.core.config import get_settings
 from app.core.db import get_db
 from app.eval.runner import run_eval
 from app.models.tables import EvalRun, Project
+
+settings = get_settings()
 
 router = APIRouter()
 
@@ -64,7 +68,10 @@ class RunEvalRequest(BaseModel):
 
 
 @router.post("/run", response_model=EvalRunOut)
-def trigger_eval_run(req: RunEvalRequest, db: Session = Depends(get_db)):
+def trigger_eval_run(req: RunEvalRequest, request: Request, db: Session = Depends(get_db)):
+    # An eval run is the most expensive thing here — a full agent loop per golden example.
+    limits.enforce(request, "eval", settings.rate_limit_eval_per_hour)
+
     project = db.get(Project, req.project_id)
     if project is None:
         raise HTTPException(404, "Project not found")

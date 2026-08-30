@@ -77,6 +77,25 @@ works via **Clone from URL**.
 Clone-from-URL becomes the only practical path, so pre-seed a demo project (clone a
 well-known public repo) before sharing the link.
 
+**Turn on the guardrails.** If visitors can paste their own GitHub URLs, one person
+ingesting a large repo will exhaust the day's embedding quota for everyone. These are all
+off by default (unlimited) and are what make a public deploy survivable:
+
+```
+MAX_INGEST_CHUNKS=400        # reject oversized repos *before* spending any embeddings
+MAX_PROJECTS=10              # cap total projects
+RATE_LIMIT_ENABLED=true
+RATE_LIMIT_INGEST_PER_HOUR=3
+RATE_LIMIT_QUERY_PER_HOUR=30
+RATE_LIMIT_EVAL_PER_HOUR=2   # an eval run is a full agent loop per golden example
+```
+
+The size check runs after chunking but before the embedding loop, so a rejected repo costs
+nothing in API calls and leaves no partial project behind. Rate limiting is per-IP,
+in-process, and resets on restart — deliberately simple, since it exists to prevent
+accidental quota exhaustion rather than to stop a determined abuser. If you outgrow that,
+you want a real limiter (Redis) rather than a bigger version of this one.
+
 **CORS is currently wide open.** `app/main.py` sets `allow_origins=["*"]`. Narrow it to your
 frontend's origin before deploying:
 
