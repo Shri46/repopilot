@@ -16,5 +16,42 @@ services:
       timeout: 5s
       retries: 10
 
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    # Reuses the same backend/.env you use for local dev (GEMINI_API_KEY, model choices).
+    env_file:
+      - path: ./backend/.env
+        required: false
+    environment:
+      # Overrides whatever DATABASE_URL backend/.env has: inside the compose network the
+      # database is "db" on its own port, not the 5433 host mapping. Values set here take
+      # precedence over env_file.
+      DATABASE_URL: postgresql+psycopg://repopilot:repopilot@db:5432/repopilot
+    ports:
+      - "8000:8000"
+    volumes:
+      # BM25 indexes and cloned repos survive container rebuilds.
+      - repopilot_data:/app/data
+      # Local-folder ingestion reads the *container's* filesystem, so repos you want to
+      # ingest must be visible inside it. HOST_REPOS points at a directory on your machine
+      # (defaults to this repo's parent); browse to /repos in the ingest UI to reach it.
+      - ${HOST_REPOS:-..}:/repos:ro
+    command: >
+      sh -c "python scripts/init_db.py &&
+             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "5173:80"
+
 volumes:
   repopilot_pgdata:
+  repopilot_data:

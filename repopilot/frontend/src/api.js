@@ -1,6 +1,8 @@
-// The Vite dev proxy doesn't reliably forward long-lived SSE streams (observed hangs on
-// the query/stream endpoint), so talk to the backend directly instead of going through /api.
-const BASE = "http://localhost:8000/api";
+// In `npm run dev` we talk to the backend directly rather than through Vite's proxy — that
+// proxy doesn't reliably forward long-lived SSE streams (observed hangs on query/stream).
+// In Docker/production VITE_API_BASE is set to "/api" and nginx does the proxying instead,
+// which keeps the app same-origin (no CORS) and handles SSE correctly.
+const BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000/api";
 
 export async function listProjects() {
   const res = await fetch(`${BASE}/projects`);
@@ -41,6 +43,17 @@ export async function ingestProject(name, repoPath) {
     throw new Error(body.detail || `Ingest failed (${res.status})`);
   }
   return res.json();
+}
+
+export async function fsBrowserEnabled() {
+  try {
+    const res = await fetch(`${BASE}/fs/enabled`);
+    if (!res.ok) return false;
+    const body = await res.json();
+    return !!body.enabled;
+  } catch {
+    return false;
+  }
 }
 
 export async function browseDir(path) {

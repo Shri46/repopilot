@@ -18,6 +18,12 @@ class Settings(BaseSettings):
 
     bm25_index_dir: str = "data/bm25_index"
 
+    # The folder picker exposes the server's filesystem to whoever can reach the API.
+    # That's fine for the local single-user setup this is designed for, but it's an
+    # information-disclosure hole on anything public — set ENABLE_FS_BROWSER=false when
+    # deploying, and ingest via the clone-from-URL path instead.
+    enable_fs_browser: bool = True
+
 
 @lru_cache
 def get_settings() -> Settings:

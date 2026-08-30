@@ -12,7 +12,24 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Query
 
+from app.core.config import get_settings
+
+settings = get_settings()
+
 router = APIRouter()
+
+
+@router.get("/enabled")
+def fs_browser_enabled() -> dict:
+    """Lets the UI hide the folder picker when the server has it turned off."""
+    return {"enabled": settings.enable_fs_browser}
+
+
+def _require_enabled() -> None:
+    if not settings.enable_fs_browser:
+        raise HTTPException(
+            404, "Filesystem browsing is disabled on this server (ENABLE_FS_BROWSER=false)."
+        )
 
 
 def _list_drives() -> list[dict]:
@@ -25,6 +42,7 @@ def _list_drives() -> list[dict]:
 
 @router.get("/browse")
 def browse(path: str = Query("")):
+    _require_enabled()
     if not path:
         if os.name == "nt":
             return {"path": "", "parent": None, "entries": _list_drives()}

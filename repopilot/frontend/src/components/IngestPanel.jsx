@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { cloneProject, ingestProject } from "../api";
+import { useEffect, useState } from "react";
+import { cloneProject, fsBrowserEnabled, ingestProject } from "../api";
 import FolderBrowser from "./FolderBrowser";
 
 const tabClass = (active) =>
@@ -18,6 +18,11 @@ export default function IngestPanel({ onIngested }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [browsing, setBrowsing] = useState(false);
+  const [canBrowse, setCanBrowse] = useState(false);
+
+  useEffect(() => {
+    fsBrowserEnabled().then(setCanBrowse);
+  }, []);
 
   function reset() {
     setName("");
@@ -105,14 +110,16 @@ export default function IngestPanel({ onIngested }) {
                   onChange={(e) => setRepoPath(e.target.value)}
                   disabled={loading}
                 />
-                <button
-                  type="button"
-                  onClick={() => setBrowsing(true)}
-                  disabled={loading}
-                  className="shrink-0 border border-slate-300 dark:border-slate-700 rounded-md px-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
-                >
-                  Browse…
-                </button>
+                {canBrowse && (
+                  <button
+                    type="button"
+                    onClick={() => setBrowsing(true)}
+                    disabled={loading}
+                    className="shrink-0 border border-slate-300 dark:border-slate-700 rounded-md px-2 text-sm text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  >
+                    Browse…
+                  </button>
+                )}
               </div>
             </div>
           ) : (
