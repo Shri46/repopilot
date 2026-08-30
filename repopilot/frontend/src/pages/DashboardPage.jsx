@@ -19,13 +19,28 @@ ChartJS.register(CategoryScale, LinearScale, BarElement, LineElement, PointEleme
 const COLOR_BLUE = "#2a78d6";
 const COLOR_ORANGE = "#eb6834";
 const COLOR_AQUA = "#1baf7a";
-const GRIDLINE = "#e1e0d9";
-const MUTED = "#898781";
+const GRIDLINE = { light: "#e1e0d9", dark: "#334155" };
+const MUTED = { light: "#898781", dark: "#94a3b8" };
 
-const baseGrid = { color: GRIDLINE, drawTicks: false };
-const baseTicks = { color: MUTED, font: { size: 11 } };
+function useIsDark() {
+  const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains("dark"));
+  useEffect(() => {
+    const observer = new MutationObserver(() => {
+      setIsDark(document.documentElement.classList.contains("dark"));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["class"] });
+    return () => observer.disconnect();
+  }, []);
+  return isDark;
+}
 
 export default function DashboardPage() {
+  const isDark = useIsDark();
+  const gridColor = isDark ? GRIDLINE.dark : GRIDLINE.light;
+  const mutedColor = isDark ? MUTED.dark : MUTED.light;
+  const baseGrid = { color: gridColor, drawTicks: false };
+  const baseTicks = { color: mutedColor, font: { size: 11 } };
+
   const [projects, setProjects] = useState([]);
   const [projectId, setProjectId] = useState("");
   const [runs, setRuns] = useState([]);
@@ -113,13 +128,13 @@ export default function DashboardPage() {
 
   const chartOpts = (yLabel) => ({
     responsive: true,
-    plugins: { legend: { labels: { color: "#52514e", font: { size: 11 } } } },
+    plugins: { legend: { labels: { color: mutedColor, font: { size: 11 } } } },
     scales: {
       x: { grid: { display: false }, ticks: baseTicks },
       y: {
         grid: baseGrid,
         ticks: baseTicks,
-        title: { display: true, text: yLabel, color: MUTED, font: { size: 11 } },
+        title: { display: true, text: yLabel, color: mutedColor, font: { size: 11 } },
         beginAtZero: true,
       },
     },
@@ -128,9 +143,9 @@ export default function DashboardPage() {
   return (
     <div>
       <div className="mb-4 flex items-center gap-2 flex-wrap">
-        <label className="text-sm text-slate-600">Project:</label>
+        <label className="text-sm text-slate-600 dark:text-slate-400">Project:</label>
         <select
-          className="border border-slate-300 rounded-md px-2 py-1 text-sm"
+          className="border border-slate-300 rounded-md px-2 py-1 text-sm bg-white text-slate-900 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
           value={projectId}
           onChange={(e) => setProjectId(e.target.value)}
         >
@@ -141,7 +156,7 @@ export default function DashboardPage() {
 
         {datasets.length > 0 && (
           <select
-            className="border border-slate-300 rounded-md px-2 py-1 text-sm"
+            className="border border-slate-300 rounded-md px-2 py-1 text-sm bg-white text-slate-900 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
             value={datasetName}
             onChange={(e) => setDatasetName(e.target.value)}
             disabled={runningEval}
@@ -155,23 +170,23 @@ export default function DashboardPage() {
         <button
           onClick={handleRunEval}
           disabled={runningEval || !projectId || !datasetName}
-          className="bg-slate-900 text-white px-3 py-1.5 rounded-lg text-sm disabled:opacity-40"
+          className="bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 px-3 py-1.5 rounded-lg text-sm disabled:opacity-40"
         >
           {runningEval ? "Running eval…" : "Run eval"}
         </button>
         {runningEval && (
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-slate-500 dark:text-slate-400">
             This runs the full agent loop per question — can take a minute or two.
           </span>
         )}
       </div>
 
-      {evalError && <p className="text-sm text-red-600 mb-4">{evalError}</p>}
+      {evalError && <p className="text-sm text-red-600 dark:text-red-400 mb-4">{evalError}</p>}
 
       {runs.length === 0 ? (
-        <p className="text-sm text-slate-500">
+        <p className="text-sm text-slate-500 dark:text-slate-400">
           No eval runs yet. Click <span className="font-medium">Run eval</span> above, or run{" "}
-          <code className="bg-slate-100 px-1 rounded">scripts/run_eval.py</code> from the CLI.
+          <code className="bg-slate-100 dark:bg-slate-800 px-1 rounded">scripts/run_eval.py</code> from the CLI.
         </p>
       ) : (
         <>
@@ -183,18 +198,18 @@ export default function DashboardPage() {
             <StatTile label="Avg cost / query" value={`$${latest.avg_cost_usd.toFixed(5)}`} />
           </div>
 
-          <div className="bg-white border border-slate-200 rounded-xl p-4 mb-6">
-            <h3 className="text-sm font-medium text-slate-700 mb-3">Retrieval & answer quality across eval runs</h3>
+          <div className="bg-white border border-slate-200 dark:bg-slate-900 dark:border-slate-700 rounded-xl p-4 mb-6">
+            <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Retrieval & answer quality across eval runs</h3>
             <Bar data={qualityData} options={chartOpts("score (0-1)")} />
           </div>
 
           <div className="grid md:grid-cols-2 gap-6">
-            <div className="bg-white border border-slate-200 rounded-xl p-4">
-              <h3 className="text-sm font-medium text-slate-700 mb-3">Latency trend</h3>
+            <div className="bg-white border border-slate-200 dark:bg-slate-900 dark:border-slate-700 rounded-xl p-4">
+              <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Latency trend</h3>
               <Line data={latencyData} options={chartOpts("ms")} />
             </div>
-            <div className="bg-white border border-slate-200 rounded-xl p-4">
-              <h3 className="text-sm font-medium text-slate-700 mb-3">Cost trend</h3>
+            <div className="bg-white border border-slate-200 dark:bg-slate-900 dark:border-slate-700 rounded-xl p-4">
+              <h3 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">Cost trend</h3>
               <Line data={costData} options={chartOpts("USD")} />
             </div>
           </div>

@@ -11,14 +11,14 @@ export default function StepTrace({ steps }) {
   return (
     <div className="space-y-2 mb-3">
       {steps.map((s, i) => (
-        <div key={i} className="text-xs bg-slate-100 rounded-lg px-3 py-2 text-slate-600">
+        <div key={i} className="text-xs bg-slate-100 dark:bg-slate-800 rounded-lg px-3 py-2 text-slate-600 dark:text-slate-400">
           {s.step_type === "tool_call" ? (
             <>
-              <span className="font-medium text-slate-800">
+              <span className="font-medium text-slate-800 dark:text-slate-200">
                 {TOOL_LABELS[s.tool_name] || s.tool_name}
               </span>
               {s.tool_input && (
-                <span className="ml-1 text-slate-500">
+                <span className="ml-1 text-slate-500 dark:text-slate-500">
                   {JSON.stringify(s.tool_input)}
                 </span>
               )}

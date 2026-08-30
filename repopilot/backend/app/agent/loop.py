@@ -61,17 +61,23 @@ class AgentRunResult:
 
 
 def _execute_tool(db: Session, project_id: UUID, repo_root: str, name: str, args: dict) -> str:
-    if name == "search_code":
-        return tool_search_code(db, project_id, args.get("query", ""))
-    if name == "read_file":
-        return tool_read_file(repo_root, args.get("file_path", ""), args.get("start_line"), args.get("end_line"))
-    if name == "grep":
-        return tool_grep(repo_root, args.get("pattern", ""))
-    if name == "run_tests":
-        return tool_run_tests(repo_root, args.get("test_path", ""))
-    if name == "git_blame":
-        return tool_git_blame(repo_root, args.get("file_path", ""), args.get("start_line", 0), args.get("end_line", 0))
-    return f"Unknown tool: {name}"
+    try:
+        if name == "search_code":
+            return tool_search_code(db, project_id, args.get("query", ""))
+        if name == "read_file":
+            return tool_read_file(repo_root, args.get("file_path", ""), args.get("start_line"), args.get("end_line"))
+        if name == "grep":
+            return tool_grep(repo_root, args.get("pattern", ""))
+        if name == "run_tests":
+            return tool_run_tests(repo_root, args.get("test_path", ""))
+        if name == "git_blame":
+            return tool_git_blame(repo_root, args.get("file_path", ""), args.get("start_line", 0), args.get("end_line", 0))
+        return f"Unknown tool: {name}"
+    except Exception as e:
+        # A single tool crashing (bad repo content, OS quirk, etc.) shouldn't take the
+        # whole agent run down — report it back to the model as a failed tool call so it
+        # can adapt (try another tool, ask a narrower question) instead of a 500.
+        return f"Tool '{name}' failed: {e}"
 
 
 def run_agent(

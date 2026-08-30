@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes_projects import router as projects_router
 from app.api.routes_query import router as query_router
 from app.api.routes_eval import router as eval_router
+from app.api.routes_fs import router as fs_router
 
 app = FastAPI(title="RepoPilot API", version="0.1.0")
 
@@ -17,6 +18,7 @@ app.add_middleware(
 app.include_router(projects_router, prefix="/api/projects", tags=["projects"])
 app.include_router(query_router, prefix="/api/query", tags=["query"])
 app.include_router(eval_router, prefix="/api/eval", tags=["eval"])
+app.include_router(fs_router, prefix="/api/fs", tags=["fs"])
 
 
 @app.get("/api/health")

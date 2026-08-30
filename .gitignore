@@ -179,3 +179,8 @@ cython_debug/
 #  refer to https://docs.cursor.com/context/ignore-files
 .cursorignore
 .cursorindexingignore
+# RepoPilot generated artifacts
+# BM25 pickles and cloned repos contain indexed content from whatever repos you ingest
+# (including private ones) — never commit them.
+repopilot/backend/data/
+repopilot/backend/eval_report_latest.json

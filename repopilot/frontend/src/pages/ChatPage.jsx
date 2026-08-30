@@ -81,9 +81,9 @@ export default function ChatPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-140px)]">
       <div className="mb-3 flex items-center gap-2 flex-wrap">
-        <label className="text-sm text-slate-600">Project:</label>
+        <label className="text-sm text-slate-600 dark:text-slate-400">Project:</label>
         <select
-          className="border border-slate-300 rounded-md px-2 py-1 text-sm"
+          className="border border-slate-300 rounded-md px-2 py-1 text-sm bg-white text-slate-900 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100"
           value={projectId}
           onChange={(e) => setProjectId(e.target.value)}
         >
@@ -98,13 +98,13 @@ export default function ChatPage() {
             onClick={handleDelete}
             disabled={deleting}
             title="Delete this project"
-            className="text-xs text-red-500 hover:text-red-700 disabled:opacity-40"
+            className="text-xs text-red-500 hover:text-red-700 dark:text-red-400 dark:hover:text-red-300 disabled:opacity-40"
           >
             {deleting ? "Deleting…" : "Delete"}
           </button>
         )}
         {projects.length === 0 && (
-          <span className="text-xs text-slate-400">No projects yet — ingest one below</span>
+          <span className="text-xs text-slate-400 dark:text-slate-500">No projects yet — ingest one below</span>
         )}
       </div>
 
@@ -114,7 +114,7 @@ export default function ChatPage() {
         {messages.map((m, i) =>
           m.role === "user" ? (
             <div key={i} className="flex justify-end">
-              <div className="bg-slate-900 text-white rounded-2xl rounded-br-sm px-4 py-2 max-w-lg">
+              <div className="bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 rounded-2xl rounded-br-sm px-4 py-2 max-w-lg">
                 {m.text}
               </div>
             </div>
@@ -123,16 +123,16 @@ export default function ChatPage() {
               <div className="max-w-2xl">
                 <StepTrace steps={m.steps} />
                 {m.text ? (
-                  <div className="bg-white border border-slate-200 rounded-2xl rounded-bl-sm px-4 py-3 whitespace-pre-wrap text-slate-800">
+                  <div className="bg-white border border-slate-200 dark:bg-slate-900 dark:border-slate-700 rounded-2xl rounded-bl-sm px-4 py-3 whitespace-pre-wrap text-slate-800 dark:text-slate-200">
                     {m.text}
                     {m.meta && (
-                      <div className="mt-2 text-xs text-slate-400">
+                      <div className="mt-2 text-xs text-slate-400 dark:text-slate-500">
                         {m.meta.latency_ms.toFixed(0)} ms · ${m.meta.cost_usd.toFixed(5)}
                       </div>
                     )}
                   </div>
                 ) : (
-                  <div className="text-sm text-slate-400 px-1">thinking…</div>
+                  <div className="text-sm text-slate-400 dark:text-slate-500 px-1">thinking…</div>
                 )}
               </div>
             </div>
@@ -140,9 +140,9 @@ export default function ChatPage() {
         )}
       </div>
 
-      <div className="flex gap-2 pt-3 border-t border-slate-200">
+      <div className="flex gap-2 pt-3 border-t border-slate-200 dark:border-slate-800">
         <input
-          className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm"
+          className="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm bg-white text-slate-900 placeholder:text-slate-400 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-100 dark:placeholder:text-slate-500"
           placeholder="Ask something about the codebase…"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
@@ -152,7 +152,7 @@ export default function ChatPage() {
         <button
           onClick={ask}
           disabled={loading || !projectId}
-          className="bg-slate-900 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-40"
+          className="bg-slate-900 text-white dark:bg-slate-100 dark:text-slate-900 px-4 py-2 rounded-lg text-sm disabled:opacity-40"
         >
           Ask
         </button>

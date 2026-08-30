@@ -55,11 +55,15 @@ def tool_grep(repo_root: str, pattern: str) -> str:
             ["grep", "-rn", "--include=*.py", "--include=*.js", "--include=*.ts",
              "--include=*.tsx", "--include=*.jsx", pattern, "."],
             cwd=repo_root, capture_output=True, text=True, timeout=15,
+            # grep's output isn't guaranteed to be in the platform's default codepage
+            # (e.g. cp1252 on Windows) — most source is UTF-8, and letting subprocess
+            # decode with the platform default silently drops stdout on a decode error.
+            encoding="utf-8", errors="replace",
         )
     except Exception as e:
         return f"grep failed: {e}"
 
-    lines = result.stdout.splitlines()[:MAX_GREP_MATCHES]
+    lines = (result.stdout or "").splitlines()[:MAX_GREP_MATCHES]
     return "\n".join(lines) if lines else "No matches."
 
 
@@ -70,13 +74,14 @@ def tool_run_tests(repo_root: str, test_path: str = "") -> str:
     try:
         result = subprocess.run(
             cmd, cwd=repo_root, capture_output=True, text=True, timeout=TEST_TIMEOUT_SECONDS,
+            encoding="utf-8", errors="replace",
         )
     except subprocess.TimeoutExpired:
         return "Test run timed out."
     except Exception as e:
         return f"Test run failed to start: {e}"
 
-    output = (result.stdout + "\n" + result.stderr).strip()
+    output = ((result.stdout or "") + "\n" + (result.stderr or "")).strip()
     return output[-4000:] if len(output) > 4000 else output
 
 

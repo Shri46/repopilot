@@ -43,6 +43,28 @@ export async function ingestProject(name, repoPath) {
   return res.json();
 }
 
+export async function browseDir(path) {
+  const res = await fetch(`${BASE}/fs/browse?${new URLSearchParams({ path: path || "" })}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || `Browse failed (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function cloneProject(name, gitUrl) {
+  const res = await fetch(`${BASE}/projects/clone`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, git_url: gitUrl }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.detail || `Clone failed (${res.status})`);
+  }
+  return res.json();
+}
+
 export async function deleteProject(projectId) {
   const res = await fetch(`${BASE}/projects/${projectId}`, { method: "DELETE" });
   if (!res.ok) {

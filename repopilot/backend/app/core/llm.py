@@ -29,19 +29,32 @@ def _client() -> genai.Client:
     return genai.Client(api_key=settings.gemini_api_key)
 
 
-def _with_retry(fn, attempts: int = 5, delay_seconds: float = 15.0):
-    """Retries a Gemini call on 429 (rate limit) with a fixed backoff.
+def _retry_delay_seconds(e: ClientError, default: float) -> float:
+    """Extracts Google's suggested RetryInfo.retryDelay (e.g. "48s") from a 429, if present."""
+    try:
+        for d in e.details.get("error", {}).get("details", []):
+            if d.get("@type", "").endswith("RetryInfo"):
+                return float(d["retryDelay"].rstrip("s")) + 1  # small buffer
+    except (AttributeError, KeyError, TypeError, ValueError):
+        pass
+    return default
+
+
+def _with_retry(fn, attempts: int = 8, delay_seconds: float = 15.0):
+    """Retries a Gemini call on 429 (rate limit), honoring the server's suggested delay.
 
     The free tier's per-minute quota is tight enough that any multi-call flow (the agent
-    loop, an eval run scoring several examples) can trip it under normal use, not just
-    heavy testing — so every call site needs this, not just embeddings.
+    loop, an eval run scoring several examples, a large ingestion batch) can trip it under
+    normal use, not just heavy testing — so every call site needs this, not just embeddings.
+    A fixed short backoff isn't enough for a long ingestion job hammering the same minute
+    window repeatedly; honor whatever delay Google actually tells us to wait.
     """
     for attempt in range(attempts):
         try:
             return fn()
         except ClientError as e:
             if e.code == 429 and attempt < attempts - 1:
-                time.sleep(delay_seconds)
+                time.sleep(_retry_delay_seconds(e, delay_seconds))
                 continue
             raise
 
