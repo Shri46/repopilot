@@ -1,10 +1,33 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+def _unquote(value: str) -> str:
+    """Strips surrounding quotes and whitespace from an env value.
+
+    A .env parser strips quotes; a hosting dashboard's env-var field does not. Pasting a
+    quoted connection string into one produces a value with literal quote characters, and
+    the resulting SQLAlchemy error ("Could not parse SQLAlchemy URL") doesn't obviously
+    point at them. Cheap to tolerate, annoying to debug.
+    """
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
+        value = value[1:-1].strip()
+    return value
 
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+
+    @field_validator(
+        "database_url", "database_url_unpooled", "gemini_api_key", "cors_origins",
+        mode="before",
+    )
+    @classmethod
+    def _strip_quotes(cls, v):
+        return _unquote(v) if isinstance(v, str) else v
 
     gemini_api_key: str = ""
     database_url: str = "postgresql+psycopg://repopilot:repopilot@localhost:5433/repopilot"
