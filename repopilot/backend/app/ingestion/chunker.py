@@ -19,6 +19,28 @@ SKIP_EXTENSIONS = {
     ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".pdf", ".woff", ".woff2",
     ".ttf", ".eot", ".zip", ".gz", ".lock", ".min.js", ".map",
 }
+
+# Files whose contents are credentials. These must never be embedded: chunks are
+# retrievable via search_code, which feeds them to the model as tool output — so ingesting
+# a repo with a .env would quietly ship its secrets to the LLM provider and store them in
+# the vector database. Matched on the whole filename, since ".env.production" has an
+# extension of ".production" and ".env" isn't an extension at all.
+SECRET_FILENAME_PREFIXES = (".env",)
+SECRET_FILENAMES = {
+    "credentials.json", "service-account.json", "secrets.json", "secrets.yaml", "secrets.yml",
+    ".npmrc", ".pypirc", ".netrc", ".htpasswd",
+}
+SECRET_EXTENSIONS = {".pem", ".key", ".p12", ".pfx", ".jks", ".keystore"}
+
+# Dependency lock files: enormous, machine-generated, and useless for answering questions
+# about a codebase. On this repo package-lock.json alone was 21% of all chunks — pure
+# embedding spend that also pollutes retrieval with dependency noise.
+LOCK_FILENAMES = {
+    "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "npm-shrinkwrap.json",
+    "poetry.lock", "pdm.lock", "uv.lock", "cargo.lock", "composer.lock",
+    "gemfile.lock", "go.sum", "flake.lock",
+}
+
 MAX_FILE_BYTES = 500_000  # skip huge generated files
 
 
@@ -31,10 +53,24 @@ class RawChunk:
     content: str
 
 
+def is_secret_file(filename: str) -> bool:
+    lower = filename.lower()
+    # .env.example / .env.sample are documentation templates, not real credentials.
+    if lower.startswith(".env") and not lower.endswith((".example", ".sample", ".template")):
+        return True
+    if lower in SECRET_FILENAMES:
+        return True
+    return any(lower.endswith(ext) for ext in SECRET_EXTENSIONS)
+
+
 def should_skip_path(path_parts: list[str], filename: str) -> bool:
     if any(part in SKIP_DIR_NAMES for part in path_parts):
         return True
     lower = filename.lower()
+    if is_secret_file(filename):
+        return True
+    if lower in LOCK_FILENAMES:
+        return True
     return any(lower.endswith(ext) for ext in SKIP_EXTENSIONS)
 
 

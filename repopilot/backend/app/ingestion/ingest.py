@@ -101,10 +101,13 @@ def ingest_repo(db: Session, project_name: str, repo_path: str, embed: bool = Tr
 
     bm25_corpus_tokens = []
     chunk_rows = []
+    blame_cache: dict = {}  # one git blame per file, not per chunk
     for idx, rc in enumerate(tqdm(raw_chunks, desc="persisting chunks")):
         author, modified = (None, None)
         if git_repo is not None:
-            author, modified = blame_for_range(git_repo, rc.file_path, rc.start_line, rc.end_line)
+            author, modified = blame_for_range(
+                git_repo, rc.file_path, rc.start_line, rc.end_line, cache=blame_cache
+            )
 
         chunk = Chunk(
             project_id=project.id,
