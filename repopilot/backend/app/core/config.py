@@ -24,6 +24,11 @@ class Settings(BaseSettings):
     # deploying, and ingest via the clone-from-URL path instead.
     enable_fs_browser: bool = True
 
+    # Comma-separated allowed browser origins, e.g. "https://repopilot.onrender.com".
+    # "*" (the default) is fine locally but should be narrowed on a real deployment,
+    # where the frontend is served from a different origin than the API.
+    cors_origins: str = "*"
+
     # --- Public-deployment guardrails -------------------------------------------------
     # All default to "off" so local single-user use is unrestricted. Turn them on for any
     # deployment strangers can reach, where the real risk isn't malice so much as one

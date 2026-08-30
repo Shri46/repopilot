@@ -5,12 +5,17 @@ from app.api.routes_projects import router as projects_router
 from app.api.routes_query import router as query_router
 from app.api.routes_eval import router as eval_router
 from app.api.routes_fs import router as fs_router
+from app.core.config import get_settings
+
+settings = get_settings()
 
 app = FastAPI(title="RepoPilot API", version="0.1.0")
 
+_origins = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # tighten before deploying
+    allow_origins=_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

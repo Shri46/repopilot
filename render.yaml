@@ -1,0 +1,79 @@
+# Render blueprint: static frontend + Dockerized API.
+#
+# The frontend is a static site on purpose. Render's free web services sleep after ~15
+# minutes and take 30-60s to wake; static sites don't sleep. Splitting them means the
+# landing page loads instantly and only the first API call pays the wake-up cost, instead
+# of a visitor staring at a blank page.
+#
+# The database is NOT defined here — use an external Neon Postgres and paste its
+# connection string into DATABASE_URL. Render's own free Postgres expires 30 days after
+# creation, which would silently kill a link you've shared.
+#
+# Values marked `sync: false` are secrets/URLs you fill in from the Render dashboard.
+
+services:
+  - type: web
+    name: repopilot-api
+    runtime: docker
+    rootDir: repopilot/backend
+    dockerfilePath: ./Dockerfile
+    plan: free
+    region: virginia # match your Neon region
+    healthCheckPath: /api/health
+    envVars:
+      # Neon connection string. Must use the psycopg driver, i.e. rewrite Neon's
+      # postgresql://...  as  postgresql+psycopg://...
+      - key: DATABASE_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      # The frontend's origin, e.g. https://repopilot-web.onrender.com
+      - key: CORS_ORIGINS
+        sync: false
+
+      # Never expose the server's filesystem on a public URL.
+      - key: ENABLE_FS_BROWSER
+        value: "false"
+
+      # Public-deployment guardrails — see docs/DEPLOY.md.
+      - key: MAX_INGEST_CHUNKS
+        value: "400"
+      - key: MAX_PROJECTS
+        value: "10"
+      - key: RATE_LIMIT_ENABLED
+        value: "true"
+      - key: RATE_LIMIT_INGEST_PER_HOUR
+        value: "3"
+      - key: RATE_LIMIT_QUERY_PER_HOUR
+        value: "30"
+      - key: RATE_LIMIT_EVAL_PER_HOUR
+        value: "2"
+
+      - key: AGENT_MODEL
+        value: gemini-3.5-flash-lite
+      - key: EMBEDDING_MODEL
+        value: gemini-embedding-001
+      - key: EMBEDDING_DIM
+        value: "768"
+      - key: AGENT_MAX_STEPS
+        value: "6"
+      - key: RETRIEVAL_TOP_K
+        value: "8"
+
+  - type: web
+    name: repopilot-web
+    runtime: static
+    rootDir: repopilot/frontend
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      # Absolute API base, e.g. https://repopilot-api.onrender.com/api
+      # (Static hosting has no proxy, so the browser calls the API cross-origin —
+      # which is why the API needs CORS_ORIGINS set to this site's URL.)
+      - key: VITE_API_BASE
+        sync: false
+    routes:
+      # React Router owns /chat and /dashboard, so deep links must fall back to index.html.
+      - type: rewrite
+        source: /*
+        destination: /index.html

@@ -14,4 +14,6 @@ COPY . .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Creates the pgvector extension + tables if they don't exist, then serves. $PORT is what
+# Render (and most PaaS) inject; 8000 is the local/compose default.
+CMD ["sh", "-c", "python scripts/init_db.py && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
